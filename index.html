@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Данные из таблицы</title>
+    <meta charset="UTF-8">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2980, #26d0ce);
+            padding: 20px;
+            min-height: 100vh;
+            margin: 0;
+            color: white;
+        }
+        
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        
+        h1 {
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            margin-bottom: 25px;
+            font-size: 24px;
+        }
+        
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .day-btn {
+            aspect-ratio: 1;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .day-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+        
+        .summary-btn {
+            background: #ff9800;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            max-width: 300px;
+            margin: 10px auto 20px;
+            box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .summary-btn:hover {
+            background: #f57c00;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(245, 124, 0, 0.4);
+        }
+        
+        .result-container {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px;
+            margin-top: 25px;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: left;
+            width: 100%;
+        }
+        
+        .result-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+            color: #ffeb3b;
+            word-break: break-word;
+        }
+        
+        .loading {
+            display: none;
+            margin: 20px;
+        }
+        
+        .error {
+            color: #ff5252;
+            font-weight: bold;
+        }
+        
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        .summary-table th {
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 8px;
+            text-align: left;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .summary-table td {
+            padding: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .summary-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .summary-value {
+            color: #4caf50;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Данные из Google Таблицы</h1>
+        
+        <div class="days-grid" id="daysContainer">
+            <!-- Кнопки дней будут сгенерированы через JS -->
+        </div>
+        
+        <button class="summary-btn" id="summaryBtn">ИТОГ (E-K)</button>
+        
+        <div class="result-container" id="resultContainer">
+            <p>Выберите день или нажмите "ИТОГ"</p>
+        </div>
+        
+        <div class="loading" id="loading">
+            <p>Загрузка данных...</p>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram?.WebApp;
+        const backendUrl = 'ВАШ_БЭКЕНД_URL'; // Замените на реальный URL
+        const getDataEndpoint = backendUrl + '/get-data';
+        const getSummaryEndpoint = backendUrl + '/get-summary';
+        
+        // Соответствие кнопок столбцам
+        const columnsMapping = {
+            '1': 'M',
+            '2': 'N',
+            '3': 'O',
+            '4': 'P',
+            '5': 'Q',
+            '6': 'R',
+            '7': 'S',
+            '8': 'T',
+            '9': 'U',
+            '10': 'V',
+            '11': 'W',
+            '12': 'X',
+            '13': 'Y',
+            '14': 'Z',
+            '15': 'AA',
+            '16': 'AB',
+            '17': 'AC',
+            '18': 'AD',
+            '19': 'AE',
+            '20': 'AF',
+            '21': 'AG',
+            '22': 'AH',
+            '23': 'AI',
+            '24': 'AJ',
+            '25': 'AK',
+            '26': 'AL',
+            '27': 'AM',
+            '28': 'AN',
+            '29': 'AO',
+            '30': 'AP',
+            '31': 'AQ'
+        };
+        
+        // Инициализация приложения
+        function init() {
+            // Создаем кнопки дней
+            const container = document.getElementById('daysContainer');
+            for (let i = 1; i <= 31; i++) {
+                const btn = document.createElement('div');
+                btn.className = 'day-btn';
+                btn.textContent = i;
+                btn.dataset.day = i;
+                btn.addEventListener('click', () => fetchDayData(i.toString()));
+                container.appendChild(btn);
+            }
+            
+            // Обработчик кнопки ИТОГ
+            document.getElementById('summaryBtn').addEventListener('click', fetchSummaryData);
+            
+            // Инициализация Telegram WebApp
+            if (tg) {
+                tg.expand();
+                tg.enableClosingConfirmation();
+            }
+        }
+        
+        // Получение номера телефона пользователя
+        async function getUserPhone() {
+            if (tg?.initDataUnsafe?.user?.phone_number) {
+                return tg.initDataUnsafe.user.phone_number;
+            }
+            
+            // Если номер недоступен, запрашиваем
+            try {
+                await tg.requestContact();
+                return tg.initDataUnsafe.user.phone_number;
+            } catch (e) {
+                showError('Доступ к номеру телефона не предоставлен');
+                throw new Error('Phone number required');
+            }
+        }
+        
+        // Запрос данных для конкретного дня
+        async function fetchDayData(day) {
+            const loading = document.getElementById('loading');
+            const resultContainer = document.getElementById('resultContainer');
+            
+            try {
+                loading.style.display = 'block';
+                resultContainer.innerHTML = '';
+                
+                const phone = await getUserPhone();
+                const column = columnsMapping[day];
+                
+                const response = await fetch(getDataEndpoint, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ phone, column })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+                
+                resultContainer.innerHTML = `
+                    <p>Данные для дня ${day} (столбец ${column}):</p>
+                    <div class="result-value">${data.value || 'Пусто'}</div>
+                    <p>Телефон: ${phone}</p>
+                `;
+                
+            } catch (error) {
+                showError(error.message || 'Ошибка при получении данных');
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+        
+        // Запрос итоговых данных
+        async function fetchSummaryData() {
+            const loading = document.getElementById('loading');
+            const resultContainer = document.getElementById('resultContainer');
+            
+            try {
+                loading.style.display = 'block';
+                resultContainer.innerHTML = '';
+                
+                const phone = await getUserPhone();
+                
+                const response = await fetch(getSummaryEndpoint, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ phone })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+                
+                let tableHTML = `
+                    <h3>Итоговые данные (столбцы E-K):</h3>
+                    <table class="summary-table">
+                        <tr>
+                            <th>Столбец</th>
+                            <th>Значение</th>
+                        </tr>
+                `;
+                
+                for (const [col, value] of Object.entries(data.summary)) {
+                    tableHTML += `
+                        <tr>
+                            <td>${col}</td>
+                            <td class="summary-value">${value || 'Нет данных'}</td>
+                        </tr>
+                    `;
+                }
+                
+                tableHTML += '</table>';
+                tableHTML += `<p>Телефон: ${phone}</p>`;
+                
+                resultContainer.innerHTML = tableHTML;
+                
+            } catch (error) {
+                showError(error.message || 'Ошибка при получении данных');
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+        
+        // Отображение ошибки
+        function showError(message) {
+            const resultContainer = document.getElementById('resultContainer');
+            resultContainer.innerHTML = `<p class="error">${message}</p>`;
+        }
+        
+        // Запуск приложения
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
